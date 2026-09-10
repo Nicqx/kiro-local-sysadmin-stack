@@ -1,4 +1,5 @@
 kiro-local-sysadmin-stack-v*.zip
+.package/
 __pycache__/
 *.py[cod]
 *.log
