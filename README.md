@@ -1,4 +1,4 @@
-# Kiro Local Sysadmin Stack v0.3.5
+# Kiro Local Sysadmin Stack
 
 Experimental fully-local sysadmin-agent stack built from:
 
@@ -7,54 +7,43 @@ Experimental fully-local sysadmin-agent stack built from:
 - Ollama — local LLM inference
 - a local ACP compatibility adapter between Kiro Crew and Goose
 
-The current Linux package includes automatic Ollama model selection, NVIDIA/AMD/Intel GPU detection, Docker GPU passthrough, Kiro Crew managed-service/AppArmor setup, clean reset/reinstall helpers and diagnostics. Windows support is experimental.
+The Linux installer includes automatic Ollama model selection, NVIDIA/AMD/Intel GPU detection, Docker GPU passthrough, Kiro Crew managed-service/AppArmor setup, reset/reinstall helpers and diagnostics. Windows support remains experimental.
 
 ## Quick install from GitHub
 
-Run the installer as your normal login user. **Do not run the whole installer with `sudo`.**
+Run as your normal login user. **Do not run the whole installer with `sudo`.** It requests sudo internally only for the few system-wide steps that need it.
 
 ```bash
 git clone https://github.com/Nicqx/kiro-local-sysadmin-stack.git
 cd kiro-local-sysadmin-stack
-bash ./bootstrap.sh
-unzip kiro-local-sysadmin-stack-v0.3.5.zip
-cd kiro-local-sysadmin-stack-v0.3.5
-./scripts/install.sh
+./install.sh
 ```
 
-`bootstrap.sh` reconstructs the v0.3.5 package stored in this repository and verifies its SHA-256 before accepting it.
-
-Expected package checksum:
-
-```text
-e3cb9343e626b2cdf82a5a1e06552e5b4edec19dd916c4b2d13403b0611954e5
-```
+No manual bootstrap or unzip step is required.
 
 ## Completely clean reinstall
 
-If you are replacing one of the test versions and want to remove the stack-owned runtime, configuration, history/memory and downloaded Ollama models first:
-
 ```bash
-./scripts/full-reset-install.sh
+./install.sh --reset
 ```
 
-The script asks you to type `RESET`. It may request `sudo` internally for specific system operations, but the script itself must be started as the normal login user.
+This removes stack-owned runtime/configuration/history/memory and downloaded Ollama models before installing again. Docker and GPU drivers are left intact.
 
-## Keep persistent data and reinstall runtime/config
+## Fresh runtime reinstall while preserving persistent stack data
 
 ```bash
-./scripts/fresh-install.sh --disable-native-ollama
+./install.sh --fresh
 ```
 
 ## Common commands
 
 ```bash
-./scripts/status.sh
-./scripts/gpu-status.sh
-./scripts/doctor.sh --deep
-./scripts/chat.sh
-./scripts/token.sh 8h
-./scripts/recover-crew.sh
+./status.sh
+./doctor.sh --deep
+./chat.sh
+./token.sh 8h
+./update.sh
+./uninstall.sh
 ```
 
 Local dashboard:
@@ -63,17 +52,25 @@ Local dashboard:
 http://127.0.0.1:5476
 ```
 
-## Update the repository copy
+If the dashboard says the session expired, generate a fresh URL:
 
 ```bash
-git pull
+./token.sh 8h
 ```
 
-When a newer package version is published here, the README/bootstrap version will be updated with it.
+and open the complete URL it prints.
 
-## Current v0.3.5 integration state
+## Updates
 
-The package currently uses this Linux architecture:
+From the checkout:
+
+```bash
+./update.sh
+```
+
+The update entry point performs a fast-forward-only `git pull` and then runs the stack updater.
+
+## Architecture
 
 ```text
 Kiro Crew managed service
@@ -89,33 +86,37 @@ CPU / NVIDIA / AMD / Intel GPU
 
 Kiro Crew's required `kirocrew` and `kirocrew-lite` modes are translated by the local ACP adapter. The main agent maps to Goose `approve`; the tool-less background `kirocrew-lite` mode maps to Goose `chat`.
 
-On Ubuntu versions with restricted unprivileged user namespaces, the installer uses Kiro Crew's managed service so its narrow AppArmor `kirocrew-userns` profile can provide namespace sandboxing without globally weakening the kernel setting.
+On Ubuntu systems that restrict unprivileged user namespaces, the installer uses Kiro Crew's managed service so its narrow AppArmor `kirocrew-userns` profile can provide namespace sandboxing without globally weakening the kernel setting.
 
 ## Persistent locations
 
-The checkout itself is disposable. Runtime/configuration and durable data live outside it:
+The Git checkout is disposable. Runtime/configuration and durable data live outside it:
 
 ```text
 ~/.config/kiro-local/
 ~/.local/share/kiro-local/
 ```
 
-This allows the installer source to be replaced or updated without automatically deleting Crew/Goose persistent state.
+This allows the source checkout to be updated or replaced without automatically deleting Crew/Goose persistent state.
+
+## Compatibility note
+
+The repository still contains the previous bundled v0.3.5 payload as a temporary fallback. The root-level launchers hide that packaging detail, so normal usage is already `git clone` → `./install.sh`. The bundle/bootstrap compatibility layer can be removed after this direct-clone path has been validated on the test machines.
 
 ## Safety
 
-Keep the initial execution mode conservative while testing:
+Keep initial execution conservative while testing:
 
 ```text
 GOOSE_MODE=approve
 CREW_APPROVAL_MODE=interactive
 ```
 
-Start with read-only system inspection, then test a disposable file operation, and only afterwards move on to service/autostart administration.
+Start with read-only inspection, then test a disposable file operation, and only afterwards move on to service/autostart administration.
 
 ## Notes
 
 - Docker Compose v2 is required on Linux.
 - The NVIDIA driver must already work on the host (`nvidia-smi`) before NVIDIA Docker passthrough can be configured.
-- Windows support is an experimental package layer and should be treated as an integration test on the first Windows machine.
 - Voice/STT is optional and is not required for text-based sysadmin operation.
+- Windows support is experimental.
