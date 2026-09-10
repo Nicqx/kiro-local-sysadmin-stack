@@ -10,7 +10,6 @@ repo_version() {
 }
 
 ensure_package_root() {
-  # Future-proofing: if the repository is fully flattened later, prefer it.
   if [[ -x "$REPO_ROOT/scripts/install.sh" ]]; then
     PACKAGE_ROOT="$REPO_ROOT"
     export PACKAGE_ROOT
