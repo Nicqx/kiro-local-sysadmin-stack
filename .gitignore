@@ -1,0 +1,6 @@
+kiro-local-sysadmin-stack-v*.zip
+__pycache__/
+*.py[cod]
+*.log
+.env
+.DS_Store
