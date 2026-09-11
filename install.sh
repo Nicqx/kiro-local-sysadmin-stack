@@ -22,8 +22,8 @@ case "${1:-}" in
     ;;
 esac
 
-"$ROOT/toolshim-fix.sh"
+bash "$ROOT/toolshim-fix.sh"
 
 echo
 echo "Installation complete. Verify grounded tool execution with:"
-echo "  ./tool-smoke-test.sh"
+echo "  bash ./tool-smoke-test.sh"
