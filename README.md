@@ -33,6 +33,14 @@ bash ./tool-smoke-test.sh
 
 The test creates a random nonce in a private temporary file without showing the nonce to the model. Goose is asked to read the file through the developer/shell tool. The test passes only if that unknown value comes back, proving an actual tool read occurred.
 
+To test the interactive ACP approval path separately, run:
+
+```bash
+bash ./acp-approval-smoke-test.sh
+```
+
+This runs the same unknown-nonce test twice: first against `goose acp` directly in `approve` mode, then through the local Kiro→Goose compatibility adapter. It answers a real ACP `session/request_permission` with the advertised `allow_once` option. A PASS therefore proves not just tool execution, but that the permission request and response travelled correctly over the ACP connection before the tool ran.
+
 ## Completely clean reinstall
 
 ```bash
@@ -55,6 +63,7 @@ This removes stack-owned runtime/configuration/history/memory and downloaded Oll
 ./chat.sh
 ./token.sh 8h
 bash ./tool-smoke-test.sh
+bash ./acp-approval-smoke-test.sh
 ./update.sh
 ./uninstall.sh
 ```
