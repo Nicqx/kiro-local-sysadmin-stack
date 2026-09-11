@@ -21,6 +21,18 @@ cd kiro-local-sysadmin-stack
 
 No manual bootstrap or unzip step is required.
 
+The root installer also enables Goose ToolShim for the local Ollama model. This is important for smaller local models that sometimes describe a tool action in prose instead of emitting a valid structured tool call.
+
+## Prove real tool execution
+
+Do not trust a model merely because it says that it executed a command. Run the grounded smoke test:
+
+```bash
+./tool-smoke-test.sh
+```
+
+The test creates a random nonce in a private temporary file without showing the nonce to the model. Goose is asked to read the file through the developer/shell tool. The test passes only if that unknown value comes back, proving an actual tool read occurred.
+
 ## Completely clean reinstall
 
 ```bash
@@ -42,6 +54,7 @@ This removes stack-owned runtime/configuration/history/memory and downloaded Oll
 ./doctor.sh --deep
 ./chat.sh
 ./token.sh 8h
+./tool-smoke-test.sh
 ./update.sh
 ./uninstall.sh
 ```
@@ -68,7 +81,7 @@ From the checkout:
 ./update.sh
 ```
 
-The update entry point performs a fast-forward-only `git pull` and then runs the stack updater.
+The update entry point performs a fast-forward-only `git pull`, runs the stack updater, then reapplies the local ToolShim/grounding integration.
 
 ## Architecture
 
@@ -77,7 +90,7 @@ Kiro Crew managed service
         ↓ ACP
 local kiro-cli compatibility shim
         ↓
-Goose
+Goose + ToolShim
         ↓
 Ollama in Docker
         ↓
@@ -87,6 +100,8 @@ CPU / NVIDIA / AMD / Intel GPU
 Kiro Crew's required `kirocrew` and `kirocrew-lite` modes are translated by the local ACP adapter. The main agent maps to Goose `approve`; the tool-less background `kirocrew-lite` mode maps to Goose `chat`.
 
 On Ubuntu systems that restrict unprivileged user namespaces, the installer uses Kiro Crew's managed service so its narrow AppArmor `kirocrew-userns` profile can provide namespace sandboxing without globally weakening the kernel setting.
+
+The sysadmin guardrails explicitly forbid fabricated command results: if a real tool result is unavailable, the agent must say that it could not inspect the machine rather than invent output.
 
 ## Persistent locations
 
