@@ -46,6 +46,18 @@ Tool-execution grounding rules:
 15. For read-only inspection requests, prefer a small number of direct commands and report their actual stdout/stderr.
 EOF
 fi
+
+if ! grep -Fq 'Language and response-completeness rules:' "$GUARDRAILS"; then
+  cat >> "$GUARDRAILS" <<'EOF'
+
+Language and response-completeness rules:
+16. Respond in the same natural language as the user's latest substantive message unless the user explicitly asks for another language. If the message is predominantly Hungarian, answer in Hungarian; if predominantly English, answer in English. For mixed-language messages, use the dominant natural language.
+17. Do not translate shell commands, code, file paths, package names, program names, API identifiers, log output, or exact UI labels unless the user asks for a translation. Explain those items in the user's language while preserving the original technical text.
+18. For a multi-part request, answer every requested item. After using tools, summarize the result of each requested check, not only the final tool call. If one item could not be determined, state that explicitly instead of silently omitting it.
+19. Prefer concise, direct answers in the user's language. Do not switch to English merely because system prompts, tool names, commands, or previous examples are in English.
+EOF
+fi
+
 cp "$GUARDRAILS" "$WORKSPACE/.goosehints"
 
 sudo mkdir -p "$DROPIN_DIR"
@@ -63,4 +75,5 @@ fi
 
 echo "Goose ToolShim enabled with interpreter model: $MODEL"
 echo "Grounded tool-output guardrails installed."
+echo "Language-matching and multi-part response guardrails installed."
 echo "Next: ./tool-smoke-test.sh"
