@@ -12,8 +12,8 @@ from __future__ import annotations
 
 import json
 import os
+import queue
 import secrets
-import select
 import subprocess
 import sys
 import tempfile
@@ -60,8 +60,18 @@ class AcpProcess:
         self.stderr_lines: list[str] = []
         self.permission_observed = False
         self.tool_call_observed = False
+        self._stdout_queue: queue.Queue[str | None] = queue.Queue()
+        self._stdout_thread = threading.Thread(target=self._drain_stdout, daemon=True)
         self._stderr_thread = threading.Thread(target=self._drain_stderr, daemon=True)
+        self._stdout_thread.start()
         self._stderr_thread.start()
+
+    def _drain_stdout(self) -> None:
+        try:
+            for line in self.stdout:
+                self._stdout_queue.put(line)
+        finally:
+            self._stdout_queue.put(None)
 
     def _drain_stderr(self) -> None:
         try:
@@ -88,13 +98,13 @@ class AcpProcess:
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 raise SmokeError("timed out waiting for ACP output")
-            ready, _, _ = select.select([self.stdout], [], [], min(remaining, 1.0))
-            if not ready:
+            try:
+                line = self._stdout_queue.get(timeout=min(remaining, 1.0))
+            except queue.Empty:
                 if self.proc.poll() is not None:
                     raise SmokeError(f"ACP process exited with status {self.proc.returncode}")
                 continue
-            line = self.stdout.readline()
-            if not line:
+            if line is None:
                 raise SmokeError(f"ACP stdout closed (status={self.proc.poll()})")
             line = line.strip()
             if not line:
@@ -113,9 +123,7 @@ class AcpProcess:
         if not isinstance(options, list):
             return None
         for item in options:
-            if not isinstance(item, dict):
-                continue
-            if item.get("kind") != "allow_once":
+            if not isinstance(item, dict) or item.get("kind") != "allow_once":
                 continue
             option_id = item.get("optionId", item.get("id"))
             if isinstance(option_id, str) and option_id:
