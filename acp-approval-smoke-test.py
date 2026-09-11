@@ -34,7 +34,7 @@ class SmokeError(RuntimeError):
 class Target:
     name: str
     argv: list[str]
-    protocol_version: str
+    protocol_version: Any
     mode_id: str
 
 
@@ -312,7 +312,7 @@ def main() -> int:
         os.chmod(probe, 0o600)
 
         targets = [
-            Target("direct Goose ACP", [goose_bin, "acp"], "v1", "approve"),
+            Target("direct Goose ACP", [goose_bin, "acp"], 1, "approve"),
         ]
         if Path(adapter_bin).is_file():
             targets.append(
