@@ -28,7 +28,7 @@ The root installer also enables Goose ToolShim for the local Ollama model. This 
 Do not trust a model merely because it says that it executed a command. Run the grounded smoke test:
 
 ```bash
-./tool-smoke-test.sh
+bash ./tool-smoke-test.sh
 ```
 
 The test creates a random nonce in a private temporary file without showing the nonce to the model. Goose is asked to read the file through the developer/shell tool. The test passes only if that unknown value comes back, proving an actual tool read occurred.
@@ -54,7 +54,7 @@ This removes stack-owned runtime/configuration/history/memory and downloaded Oll
 ./doctor.sh --deep
 ./chat.sh
 ./token.sh 8h
-./tool-smoke-test.sh
+bash ./tool-smoke-test.sh
 ./update.sh
 ./uninstall.sh
 ```
