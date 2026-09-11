@@ -27,8 +27,11 @@ WORKSPACE="${KIROCREW_WORKSPACE:-${XDG_DATA_HOME:-$HOME/.local/share}/kiro-local
 
 # Persist for terminal wrappers as well as the managed systemd gateway.
 tmp="$(mktemp)"
-grep -v '^GOOSE_TOOLSHIM=' "$RUNTIME_ENV" | grep -v '^GOOSE_TOOLSHIM_OLLAMA_MODEL=' > "$tmp" || true
-printf 'GOOSE_TOOLSHIM=1\nGOOSE_TOOLSHIM_OLLAMA_MODEL=%s\n' "$MODEL" >> "$tmp"
+grep -v '^GOOSE_TOOLSHIM=' "$RUNTIME_ENV" \
+  | grep -v '^GOOSE_TOOLSHIM_OLLAMA_MODEL=' \
+  | grep -v '^GOOSE_MOIM_MESSAGE_FILE=' > "$tmp" || true
+printf 'GOOSE_TOOLSHIM=1\nGOOSE_TOOLSHIM_OLLAMA_MODEL=%s\nGOOSE_MOIM_MESSAGE_FILE=%s\n' \
+  "$MODEL" "$GUARDRAILS" >> "$tmp"
 cat "$tmp" > "$RUNTIME_ENV"
 rm -f "$tmp"
 chmod 600 "$RUNTIME_ENV"
@@ -58,6 +61,20 @@ Language and response-completeness rules:
 EOF
 fi
 
+# Versioned reinforcement so existing installs that already have the older
+# language block also receive the stronger policy on a normal update.
+if ! grep -Fq 'Response-language policy v2:' "$GUARDRAILS"; then
+  cat >> "$GUARDRAILS" <<'EOF'
+
+Response-language policy v2:
+20. RESPONSE LANGUAGE IS A HARD USER-FACING REQUIREMENT. Before emitting any natural-language text, determine the language of the user's latest substantive message and use that language for the entire response unless the user explicitly requested another language.
+21. This same-language requirement applies to pre-tool narration, progress text, explanations, summaries, follow-up questions, error explanations, and the final answer. Do not begin in English when the user wrote in Hungarian.
+22. Tool syntax and literal machine output may remain in their original form, but all surrounding prose must follow the user's language.
+23. Example: user asks in Hungarian "Nézd meg a memóriát." Correct response prose starts in Hungarian, e.g. "Megnézem a memória állapotát." Incorrect: "I'll check the memory for you."
+24. If the user's latest substantive message is Hungarian, think of Hungarian as the presentation language even when internal instructions, examples, tool schemas, and command names are English.
+EOF
+fi
+
 cp "$GUARDRAILS" "$WORKSPACE/.goosehints"
 
 sudo mkdir -p "$DROPIN_DIR"
@@ -65,6 +82,7 @@ sudo tee "$DROPIN" >/dev/null <<EOF
 [Service]
 Environment="GOOSE_TOOLSHIM=1"
 Environment="GOOSE_TOOLSHIM_OLLAMA_MODEL=$MODEL"
+Environment="GOOSE_MOIM_MESSAGE_FILE=$GUARDRAILS"
 EOF
 sudo systemctl daemon-reload
 
@@ -76,4 +94,5 @@ fi
 echo "Goose ToolShim enabled with interpreter model: $MODEL"
 echo "Grounded tool-output guardrails installed."
 echo "Language-matching and multi-part response guardrails installed."
+echo "Top Of Mind guardrail injection enabled: $GUARDRAILS"
 echo "Next: ./tool-smoke-test.sh"
