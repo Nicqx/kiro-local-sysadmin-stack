@@ -15,7 +15,7 @@ echo "[1/8] Updating repository..."
 git pull --ff-only
 
 # Older GitHub API-created helper files may have arrived without +x.
-chmod +x "$ROOT/install.sh" "$ROOT/update.sh" "$ROOT/status.sh" "$ROOT/doctor.sh" "$ROOT/chat.sh" "$ROOT/token.sh" "$ROOT/uninstall.sh" "$ROOT/toolshim-fix.sh" "$ROOT/tool-smoke-test.sh" "$ROOT/acp-approval-smoke-test.sh" 2>/dev/null || true
+chmod +x "$ROOT/install.sh" "$ROOT/update.sh" "$ROOT/status.sh" "$ROOT/doctor.sh" "$ROOT/chat.sh" "$ROOT/token.sh" "$ROOT/uninstall.sh" "$ROOT/start.sh" "$ROOT/stop.sh" "$ROOT/toolshim-fix.sh" "$ROOT/tool-smoke-test.sh" "$ROOT/acp-approval-smoke-test.sh" 2>/dev/null || true
 
 # Do not silently downgrade an NVIDIA machine to CPU because the driver is temporarily unavailable.
 NVIDIA_HOST=0
