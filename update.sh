@@ -18,7 +18,10 @@ git pull --ff-only
 chmod +x "$ROOT/install.sh" "$ROOT/update.sh" "$ROOT/status.sh" "$ROOT/doctor.sh" "$ROOT/chat.sh" "$ROOT/token.sh" "$ROOT/uninstall.sh" "$ROOT/toolshim-fix.sh" "$ROOT/tool-smoke-test.sh" "$ROOT/acp-approval-smoke-test.sh" 2>/dev/null || true
 
 # Do not silently downgrade an NVIDIA machine to CPU because the driver is temporarily unavailable.
+NVIDIA_HOST=0
+NVIDIA_SMI=""
 if command -v lspci >/dev/null 2>&1 && lspci | grep -qi NVIDIA; then
+  NVIDIA_HOST=1
   NVIDIA_SMI="$(command -v nvidia-smi 2>/dev/null || true)"
   [[ -z "$NVIDIA_SMI" && -x /usr/bin/nvidia-smi ]] && NVIDIA_SMI=/usr/bin/nvidia-smi
   if [[ -z "$NVIDIA_SMI" ]] || ! "$NVIDIA_SMI" -L >/dev/null 2>&1; then
@@ -90,6 +93,15 @@ if (( ! OLLAMA_READY )); then
   exit 1
 fi
 
+if (( NVIDIA_HOST )); then
+  GPU_WIRING="$(docker inspect kiro-local-ollama 2>/dev/null || true)"
+  if ! grep -Eqi '"Driver"[[:space:]]*:[[:space:]]*"nvidia"|"Runtime"[[:space:]]*:[[:space:]]*"nvidia"|nvidia\.com/gpu|"gpu"' <<<"$GPU_WIRING"; then
+    echo "ERROR: NVIDIA works on the host, but the updated Ollama container has no detectable GPU passthrough." >&2
+    echo "Refusing to report a successful update with an accidental CPU-only Ollama configuration." >&2
+    exit 1
+  fi
+fi
+
 echo "[6/8] Updating all installed Ollama models..."
 RUNTIME_ENV="${XDG_CONFIG_HOME:-$HOME/.config}/kiro-local/runtime.env"
 ACTIVE_MODEL=""
@@ -156,10 +168,11 @@ GOOSE_BIN="$HOME/.local/share/kiro-local/runtime-home/.local/bin/goose"
 [[ -x "$GOOSE_BIN" ]] && "$GOOSE_BIN" --version || true
 docker exec kiro-local-ollama ollama --version 2>/dev/null || true
 
-if command -v nvidia-smi >/dev/null 2>&1; then
+if (( NVIDIA_HOST )) && [[ -n "$NVIDIA_SMI" ]]; then
   echo
   echo "NVIDIA:"
-  nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader 2>/dev/null || true
+  "$NVIDIA_SMI" --query-gpu=name,driver_version,memory.total --format=csv,noheader 2>/dev/null || true
+  echo "Ollama GPU wiring: detected"
 fi
 
 trap - ERR
