@@ -23,6 +23,8 @@ No manual bootstrap or unzip step is required.
 
 The root installer also enables Goose ToolShim for the local Ollama model. This is important for smaller local models that sometimes describe a tool action in prose instead of emitting a valid structured tool call.
 
+By default the main assistant model remains `qwen3:8b`, while ToolShim uses a separate lightweight `qwen2.5:3b` interpreter. Keeping the interpreter separate avoids asking the same reasoning model to parse its own malformed pseudo-tool/XML output. `./install.sh`, `./update.sh`, and `./toolshim-fix.sh` automatically pull/manage the interpreter model. Override it with `TOOLSHIM_MODEL=<ollama-model>` in `~/.config/kiro-local/stack.env` if needed.
+
 ## Prove real tool execution
 
 Do not trust a model merely because it says that it executed a command. Run the grounded smoke test:
