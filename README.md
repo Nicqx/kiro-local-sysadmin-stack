@@ -64,6 +64,8 @@ This removes stack-owned runtime/configuration/history/memory and downloaded Oll
 ./doctor.sh --deep
 ./chat.sh
 ./token.sh 8h
+./stop.sh
+./start.sh
 bash ./tool-smoke-test.sh
 bash ./acp-approval-smoke-test.sh
 ./update.sh
@@ -83,6 +85,24 @@ If the dashboard says the session expired, generate a fresh URL:
 ```
 
 and open the complete URL it prints.
+
+## Resource-saving stop/start
+
+To completely release the stack's CPU/GPU/RAM resources and keep it stopped across reboots:
+
+```bash
+./stop.sh
+```
+
+This disables and stops the Kiro Crew systemd service, stops the Ollama container, and changes the Ollama container restart policy to `no`.
+
+To start the stack again and restore normal boot-time startup:
+
+```bash
+./start.sh
+```
+
+This restores the Ollama restart policy to `unless-stopped`, starts Ollama, enables/starts Kiro Crew, and verifies that the dashboard is reachable.
 
 ## Updates
 
