@@ -90,7 +90,9 @@ From the checkout:
 ./update.sh
 ```
 
-The update entry point performs a fast-forward-only `git pull`, runs the stack updater, then reapplies the local ToolShim/grounding integration.
+A successful update ends with explicit health checks for the Kiro Crew systemd service, the dashboard HTTP endpoint and the Ollama container. The updater also repairs execute permissions on the root helper scripts, so `./tool-smoke-test.sh` and `./acp-approval-smoke-test.sh` can be run directly.
+
+The update entry point is transactional: it updates the checkout, refuses to silently downgrade an NVIDIA host when `nvidia-smi` is broken, cleanly stops running Crew/Ollama services, updates the Ollama runtime image, Kiro Crew stable channel, Goose stable channel and every installed Ollama model, reapplies ToolShim/grounding/language guardrails, restarts the stack, and verifies both the Ollama runtime and dashboard before reporting success. If an update step fails, it attempts to restore services that were running before the update.
 
 ## Architecture
 
