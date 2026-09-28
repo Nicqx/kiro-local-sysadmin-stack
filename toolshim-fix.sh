@@ -75,6 +75,21 @@ Response-language policy v2:
 EOF
 fi
 
+# Versioned grounding reinforcement for follow-up/result questions.
+if ! grep -Fq 'Verified-result policy v2:' "$GUARDRAILS"; then
+  cat >> "$GUARDRAILS" <<'EOF'
+
+Verified-result policy v2:
+25. A written command, code block, pseudo-XML <tool-call>, stated intention, or prior plan is NOT evidence that a tool executed. Only an actual successful tool result received from the tool runtime is evidence.
+26. If the user asks a follow-up such as "what is the result?", "mi az eredmény?", "what did it show?", or equivalent, and you do not have a real successful tool result for the requested fact in the available conversation/tool context, you MUST execute the required read-only tool now before answering.
+27. NEVER substitute an example, expected output, plausible output, remembered machine specification, generic Linux output, or model knowledge for a missing tool result. Labels such as "example", "for example", "például", "expected", "likely", or "typical" do not make fabricated machine-state output acceptable.
+28. Never present sample command output when the user asked for the actual state of this machine. If execution fails, report the failure and stderr/error honestly; do not fill the gap.
+29. A machine-state summary may contain only facts directly supported by successful tool results available to you. If one requested fact lacks a result, explicitly mark that fact as not verified and, when possible, run the missing tool.
+30. If an earlier assistant turn merely listed commands without producing tool results, treat those commands as NOT RUN. On the next request for results, run them for real.
+31. Before sending a machine-state answer, perform a provenance check: for every concrete value you are about to state, identify the successful tool result that supplied it. If you cannot, omit the value and run the relevant tool or state that it is unverified.
+EOF
+fi
+
 cp "$GUARDRAILS" "$WORKSPACE/.goosehints"
 
 sudo mkdir -p "$DROPIN_DIR"
