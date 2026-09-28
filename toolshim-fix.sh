@@ -8,6 +8,7 @@ fi
 
 CONFIG_ROOT="${XDG_CONFIG_HOME:-$HOME/.config}/kiro-local"
 RUNTIME_ENV="$CONFIG_ROOT/runtime.env"
+STACK_ENV="$CONFIG_ROOT/stack.env"
 GUARDRAILS="$CONFIG_ROOT/sysadmin-guardrails.md"
 DROPIN_DIR="/etc/systemd/system/kirocrew.service.d"
 DROPIN="$DROPIN_DIR/30-local-toolshim.conf"
@@ -23,6 +24,11 @@ source "$RUNTIME_ENV"
 set +a
 
 MODEL="${GOOSE_MODEL:-${OLLAMA_MODEL:-qwen3:8b}}"
+CONFIGURED_TOOLSHIM_MODEL=""
+if [[ -f "$STACK_ENV" ]]; then
+  CONFIGURED_TOOLSHIM_MODEL="$(awk -F= '$1=="TOOLSHIM_MODEL"{sub(/^[^=]*=/,""); gsub(/^"|"$/,""); print; exit}' "$STACK_ENV")"
+fi
+TOOLSHIM_MODEL="${KIRO_TOOLSHIM_MODEL:-${CONFIGURED_TOOLSHIM_MODEL:-qwen2.5:3b}}"
 WORKSPACE="${KIROCREW_WORKSPACE:-${XDG_DATA_HOME:-$HOME/.local/share}/kiro-local/workspace}"
 
 # Persist for terminal wrappers as well as the managed systemd gateway.
@@ -31,13 +37,24 @@ grep -v '^GOOSE_TOOLSHIM=' "$RUNTIME_ENV" \
   | grep -v '^GOOSE_TOOLSHIM_OLLAMA_MODEL=' \
   | grep -v '^GOOSE_MOIM_MESSAGE_FILE=' > "$tmp" || true
 printf 'GOOSE_TOOLSHIM=1\nGOOSE_TOOLSHIM_OLLAMA_MODEL=%s\nGOOSE_MOIM_MESSAGE_FILE=%s\n' \
-  "$MODEL" "$GUARDRAILS" >> "$tmp"
+  "$TOOLSHIM_MODEL" "$GUARDRAILS" >> "$tmp"
 cat "$tmp" > "$RUNTIME_ENV"
 rm -f "$tmp"
 chmod 600 "$RUNTIME_ENV"
 
 mkdir -p "$CONFIG_ROOT" "$WORKSPACE"
 touch "$GUARDRAILS"
+
+# Qwen3 often produces more reliable tool execution when its reasoning mode is
+# suppressed. This is a hint only; the separate ToolShim interpreter below is
+# the primary reliability fix.
+if ! grep -Fxq '/no_think' "$GUARDRAILS"; then
+  tmp_guard="$(mktemp)"
+  printf '/no_think\n\n' > "$tmp_guard"
+  cat "$GUARDRAILS" >> "$tmp_guard"
+  cat "$tmp_guard" > "$GUARDRAILS"
+  rm -f "$tmp_guard"
+fi
 if ! grep -Fq 'Tool-execution grounding rules:' "$GUARDRAILS"; then
   cat >> "$GUARDRAILS" <<'EOF'
 
@@ -90,13 +107,36 @@ Verified-result policy v2:
 EOF
 fi
 
+# Ensure the dedicated interpreter exists before restarting Crew. Keeping it
+# separate from qwen3 avoids asking the same reasoning model to parse its own
+# malformed pseudo-tool syntax.
+if docker inspect kiro-local-ollama >/dev/null 2>&1; then
+  docker start kiro-local-ollama >/dev/null 2>&1 || true
+  TOOLSHIM_READY=0
+  for _ in $(seq 1 30); do
+    if docker exec kiro-local-ollama ollama list >/dev/null 2>&1; then
+      TOOLSHIM_READY=1
+      break
+    fi
+    sleep 1
+  done
+  if (( TOOLSHIM_READY )); then
+    if ! docker exec kiro-local-ollama ollama show "$TOOLSHIM_MODEL" >/dev/null 2>&1; then
+      echo "Pulling dedicated ToolShim interpreter model: $TOOLSHIM_MODEL"
+      docker exec kiro-local-ollama ollama pull "$TOOLSHIM_MODEL"
+    fi
+  else
+    echo "WARNING: Ollama is not ready; could not verify/pull ToolShim model $TOOLSHIM_MODEL." >&2
+  fi
+fi
+
 cp "$GUARDRAILS" "$WORKSPACE/.goosehints"
 
 sudo mkdir -p "$DROPIN_DIR"
 sudo tee "$DROPIN" >/dev/null <<EOF
 [Service]
 Environment="GOOSE_TOOLSHIM=1"
-Environment="GOOSE_TOOLSHIM_OLLAMA_MODEL=$MODEL"
+Environment="GOOSE_TOOLSHIM_OLLAMA_MODEL=$TOOLSHIM_MODEL"
 Environment="GOOSE_MOIM_MESSAGE_FILE=$GUARDRAILS"
 EOF
 sudo systemctl daemon-reload
@@ -106,7 +146,8 @@ if sudo systemctl cat kirocrew.service >/dev/null 2>&1; then
   sudo systemctl restart kirocrew.service
 fi
 
-echo "Goose ToolShim enabled with interpreter model: $MODEL"
+echo "Goose main model: $MODEL"
+echo "Goose ToolShim enabled with dedicated interpreter model: $TOOLSHIM_MODEL"
 echo "Grounded tool-output guardrails installed."
 echo "Language-matching and multi-part response guardrails installed."
 echo "Top Of Mind guardrail injection enabled: $GUARDRAILS"
